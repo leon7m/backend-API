@@ -1,27 +1,27 @@
-import app from './app.js'
+import app from './app.js';
 import { Server } from "node:http";
+import { env } from './config/env.js';
+import {pool} from "./db/index.js";
 
-let server: Server;
+await pool.query("SELECT 1");
 
-async function startServer() {
-    server = app.listen(3000, () => {
-        console.log(`Server started at http://localhost:3000`);
-    });
+const server: Server = app.listen(env.PORT, (error) => {
+    if (error) throw error;
+    console.log(`Server is running on http://localhost:${env.PORT}`);
+});
 
-    server.on('error', (error) => {
-        console.error(`Veebiserveri käivitamine ebaõnnestus: ${error}`);
-        process.exit(1);
-    })
+let isShuttingDown = false;
+
+async function shutdown() {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    setTimeout(() => process.exit(1), 8000);
+
+    await new Promise(resolve => server.close(resolve));
+    await pool.end();
+    process.exit(0);
 }
 
-async function closeConnection() {
-    if (server) {
-        await new Promise(resolve => server.close(resolve));
-    }
-}
-
-startServer().catch((error) => {
-    console.error(`Veebiserveri käivitamine ebaõnnestus: ${error}`);
-    closeConnection();
-    process.exit(1);
-})
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
